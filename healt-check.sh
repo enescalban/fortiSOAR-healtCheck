@@ -52,9 +52,7 @@ check_disk "/var/log/audit"
 # ======================================================================
 echo -e "\n--- LVM Free Space ---"
 
-# vgs çıktısını okuyup her VG için boş alanı kontrol ediyoruz
 while read -r vg free; do
-    # Örnek: "<24.00g" / "9.76g" gibi değerleri temizle -> sadece tam sayı kalsın
     free=$(echo "$free" | sed 's/[^0-9.]//g' | cut -d'.' -f1)
 
     if [[ -z "$free" ]]; then
@@ -117,21 +115,21 @@ fi
 
 
 # ======================================================================
-# 6) CYOPS SERVICES (GENEL DURUM)
+# 6) CYOPS SERVICES (GENERAL FAIL CHECK)
 # ======================================================================
 echo -e "\n--- CyOps Services (General) ---"
 
 FAILED_CYOPS=$(systemctl --no-pager --state=failed 2>/dev/null | grep -c cyops || true)
 
 if (( FAILED_CYOPS > 0 )); then
-    crit "One or more cyops services FAILED (count: $FAILED_CYOPS)"
+    crit "One or more CyOps services FAILED (count: $FAILED_CYOPS)"
 else
-    ok "No cyops services in failed state"
+    ok "No CyOps services in failed state"
 fi
 
 
 # ======================================================================
-# 6.1) CYOPS MICRO-SERVICES (DETAYLI)
+# 6.1) CYOPS MICRO-SERVICES (DETAILED CHECK)
 # ======================================================================
 echo -e "\n--- CyOps Microservices (Detailed) ---"
 
@@ -144,13 +142,10 @@ check_service() {
     fi
 }
 
-# Buradaki isimler ortamına göre değişebilir; olmayan servisler için WARN veriyoruz
 SERVICES=(
     "cyops-engine"
     "cyops-frontend"
     "cyops-worker"
-    "cyops-database"
-    "cyops-rabbitmq"
 )
 
 for svc in "${SERVICES[@]}"; do
@@ -200,9 +195,9 @@ ok "Load Average: ${LOAD}"
 
 
 # ======================================================================
-# 10) FORTISOAR / REPO / CONTENTHUB CONNECTIVITY
+# 10) CONNECTIVITY TESTS
 # ======================================================================
-echo -e "\n--- FortiSOAR / Repo / ContentHub Connectivity ---"
+echo -e "\n--- Connectivity Tests ---"
 
 check_url() {
     local url="$1"
@@ -213,12 +208,51 @@ check_url() {
     fi
 }
 
-# FortiSOAR için kritik endpoint'ler
 check_url "https://repo.fortisoar.fortinet.com/"
 check_url "https://globalupdate.fortinet.net/"
 check_url "https://fortisoar.contenthub.fortinet.com/"
 check_url "https://pypi.python.org/"
 check_url "https://mirrors.rockylinux.org/"
 check_url "https://www.ntppool.org/"
+
+
+# ======================================================================
+# 11) PORT HEALTH CHECK
+# ======================================================================
+echo -e "\n--- Port Health Check ---"
+
+check_port() {
+    local port="$1"
+    local service="$2"
+
+    if ss -tulpn 2>/dev/null | grep -q ":$port "; then
+        ok "Port $port OPEN ($service)"
+    else
+        crit "Port $port CLOSED ($service)"
+    fi
+}
+
+PORTS=(
+    "9200:Elasticsearch REST"
+    "9300:Elasticsearch Node-to-Node"
+    "5672:RabbitMQ"
+    "7575:CyOps routing agent"
+    "8888:Celery Workflow"
+    "5432:PostgreSQL"
+    "8443:CyOps Auth (nginx)"
+    "9595:CyOps Integration (uWSGI)"
+    "8080:CyOps Tomcat"
+    "5671:RabbitMQ TLS"
+    "443:CyOps API / UI"
+    "25672:RabbitMQ clustering"
+    "4369:RabbitMQ epmd"
+)
+
+for entry in "${PORTS[@]}"; do
+    PORT="${entry%%:*}"
+    SERVICE="${entry#*:}"
+    check_port "$PORT" "$SERVICE"
+done
+
 
 echo -e "\n${BLUE}===== Health Check Completed =====${NC}\n"
