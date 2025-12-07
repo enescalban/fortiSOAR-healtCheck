@@ -128,8 +128,8 @@ LOAD=$(uptime | awk -F'load average:' '{print $2}')
 ok "Load Average:${LOAD}"
 
 
-# ===== 10) FORTINET REPO CHECK =====
-echo -e "\n--- Fortinet Repo Connectivity ---"
+# ===== 10) FORTISOAR CONNECTIVITY CHECK =====
+echo -e "\n--- FortiSOAR / Repo / ContentHub Connectivity ---"
 
 check_url() {
     local url="$1"
@@ -140,8 +140,12 @@ check_url() {
     fi
 }
 
+# === FortiSOAR mandatory endpoints ===
 check_url "https://repo.fortisoar.fortinet.com/"
-check_url "https://updates.fortinet.net/"
-check_url "https://repo.fortinet.com/"
+check_url "https://globalupdate.fortinet.net/"
+check_url "https://fortisoar.contenthub.fortinet.com/"
+check_url "https://pypi.python.org/"
+check_url "https://mirrors.rockylinux.org/"
+check_url "https://www.ntppool.org/"
 
 echo -e "\n${BLUE}===== Health Check Completed =====${NC}\n"
